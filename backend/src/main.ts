@@ -10,7 +10,7 @@ async function bootstrap() {
     next();
   });
 
-  await app.listen(3000);
-  console.log('NestJS API запущен на http://localhost:3000');
+  await app.listen(process.env.PORT || 5000);
+  console.log('NestJS API запущен на http://localhost:5000');
 }
 bootstrap();
