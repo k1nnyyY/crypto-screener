@@ -1,0 +1,14 @@
+{
+  "server_count": 3,
+  "servers": [
+    {"ip": "195.133.10.105", "password": "Y8n1Is6zO2MeUmE"},
+    {"ip": "5.188.3.152", "password": "6e1J2WW1e93C"},
+    {"ip": "103.20.235.184", "password": "hbaA2QU80P4ZtyN76i"}
+  ],
+  "shadowsocks": {
+    "password": "secure123",
+    "port": 8388
+  },
+  "hosts": ["example.com", "api.example.com"]
+}
+
