@@ -1,12 +1,13 @@
 import { Controller, Post, Body } from '@nestjs/common';
-import { SetupService } from '../services/setup.service';
+import { SetupService } from './setup.service';
+import { SetupDto } from './setup.dto';
 
 @Controller('setup')
 export class SetupController {
   constructor(private readonly setupService: SetupService) {}
 
   @Post()
-  async handleSetup(@Body() data) {
-    return this.setupService.setupServers(data);
+  async setup(@Body() setupDto: SetupDto) {
+    return this.setupService.setupServers(setupDto);
   }
 }

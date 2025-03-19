@@ -1,9 +1,13 @@
 import { Module } from '@nestjs/common';
-import { SetupController } from './controllers/setup.controller';
-import { SetupService } from './services/setup.service';
+import { SetupModule } from './modules/setup/setup.module';
+import { ResetModule } from './modules/reset/reset.module';
+import { SshModule } from './common/ssh/ssh.module';
 
 @Module({
-  controllers: [SetupController],
-  providers: [SetupService],
+  imports: [
+    SetupModule,
+    ResetModule,
+    SshModule,
+  ],
 })
 export class AppModule {}
