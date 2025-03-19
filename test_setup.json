@@ -7,7 +7,7 @@
   ],
   "shadowsocks": {
     "password": "secure123",
-    "port": 8388
+    "port": 8389
   },
   "hosts": ["example.com", "api.example.com"]
 }

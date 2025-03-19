@@ -102,14 +102,14 @@ services:
     container_name: proxy
     ports:
       - "1080:1080"
-      - "8388:8388"
+      - "8389:8389"
     restart: unless-stopped
     logging:
       driver: 'json-file'
       options:
         max-size: '800k'
         max-file: '10'
-    command: -verbose -listen ss://AEAD_AES_256_GCM:${shadowsocks.password}@api:8388 -forward ss://AEAD_AES_256_GCM:${shadowsocks.password}@${nextServerIp}:8388`;
+    command: -verbose -listen ss://AEAD_AES_256_GCM:${shadowsocks.password}@api:8389 -forward ss://AEAD_AES_256_GCM:${shadowsocks.password}@${nextServerIp}:8389`;
 
         await this.sshService.executeCommand(ssh, `echo "${composeContent}" > docker-compose.yml`);
 
@@ -136,7 +136,7 @@ services:
         const configJson = `{
   "server": ["::0", "0.0.0.0"],
   "mode": "tcp_and_udp",
-  "server_port": 8388,
+  "server_port": 8389,
   "local_port": 1080,
   "password": "${shadowsocks.password}",
   "timeout": 60,
@@ -180,13 +180,39 @@ WantedBy=multi-user.target`;
           sshFinal,
           `echo '${serviceContent}' > /etc/systemd/system/shadowsocks-libev-server@.service`
         );
-
+        await this.sshService.executeCommand(
+          sshFinal,
+          'apt update && apt install -y shadowsocks-libev --reinstall'
+        );
+        
+        // Убедимся, что пакет установлен
+        const isInstalled = await this.sshService.executeCommand(
+          sshFinal,
+          'dpkg -l | grep shadowsocks-libev || echo "not_installed"'
+        );
+        
+        if (isInstalled.includes("not_installed")) {
+          throw new Error(`❌ Shadowsocks-libev не удалось установить на сервере ${server.ip}`);
+        }
+        
+        this.logger.log(`✅ Shadowsocks-libev успешно установлен на ${server.ip}`);
+        
+        // Включаем и сразу запускаем сервис
         await this.sshService.executeCommand(sshFinal, 'systemctl enable --now shadowsocks-libev-server@config');
-        const status = await this.sshService.executeCommand(sshFinal, 'systemctl status shadowsocks-libev-server@config');
+        
+        // Проверяем статус сервиса
+        const status = await this.sshService.executeCommand(sshFinal, 'systemctl status shadowsocks-libev-server@config || echo "not_running"');
+        
+        if (status.includes("not_running")) {
+          throw new Error(`❌ Shadowsocks-libev не запустился на сервере ${server.ip}, проверь логи systemctl`);
+        }
+        
+        this.logger.log(`✅ Shadowsocks-libev работает на ${server.ip}`);
+        
         this.logger.log(`Статус сервиса на ${server.ip}: ${status}`);
 
-        await this.sshService.executeCommand(sshFinal, 'iptables -I INPUT -p tcp --dport 8388 -j ACCEPT');
-        await this.sshService.executeCommand(sshFinal, 'iptables -I INPUT -p udp --dport 8388 -j ACCEPT');
+        await this.sshService.executeCommand(sshFinal, 'iptables -I INPUT -p tcp --dport 8389 -j ACCEPT');
+        await this.sshService.executeCommand(sshFinal, 'iptables -I INPUT -p udp --dport 8389 -j ACCEPT');
 
         const hostsEntry = `13.225.164.218 fapi.binance.com
 13.227.61.59 fapi.binance.com
@@ -215,7 +241,7 @@ WantedBy=multi-user.target`;
       await this.sshService.executeCommand(ssh, 'history -c && echo > ~/.bash_history');
       await this.sshService.executeCommand(ssh, 'rm -rf /var/log/* /tmp/*');
 
-      const ssCheck = await this.sshService.executeCommand(ssh, 'ss -tulnp | grep 8388 || echo "not_running"');
+      const ssCheck = await this.sshService.executeCommand(ssh, 'ss -tulnp | grep 8389 || echo "not_running"');
       if (ssCheck.includes('not_running')) {
         this.logger.error(`❌ Shadowsocks не запущен на ${server.ip}, пробуем перезапуск...`);
         await this.sshService.executeCommand(ssh, 'systemctl restart shadowsocks-libev || true');
