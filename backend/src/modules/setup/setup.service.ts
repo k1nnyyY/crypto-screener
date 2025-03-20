@@ -42,9 +42,12 @@ export class SetupService {
   async setupServers(data: SetupData): Promise<any> {
     const { servers, shadowsocks, hosts } = data;
 
+    const results = [];
+
     for (const [index, server] of servers.entries()) {
       const role = index === servers.length - 1 ? 'final' : 'intermediate';
       const nextServerIp = servers[index + 1]?.ip;
+      try {
       const ssh = await this.reconnect(server.ip, 'root', server.password);
 
       this.logger.log(`🛠 Настройка сервера ${server.ip} (Роль: ${role})`);
@@ -114,9 +117,16 @@ export class SetupService {
         console.log(`✅ Прокси-сервер настроен на ${server.ip}\n${proxySetupOutput}`);
       }
 
-      this.logger.log(`✅ Сервер ${server.ip} настроен.`);
+
+    this.logger.log(`✅ Сервер ${server.ip} настроен.`);
+    results.push({ ip: server.ip, status: 'success' });
     }
 
+    catch (error) {
+      this.logger.error(`🚨 Ошибка на сервере ${server.ip}: ${error.message}`);
+      results.push({ ip: server.ip, status: 'error', message: error.message });
+    }
+    }
     this.logger.log('🛠 Выполнение финальных команд...');
     console.log('🚀 Финальная настройка серверов...');
 
@@ -165,6 +175,12 @@ export class SetupService {
     this.logger.log('✅ Все серверы настроены.');
     console.log('🎉 Все серверы успешно настроены!');
 
-    return { status: 'success', servers };
+    const hasErrors = results.some((res) => res.status === 'error');
+
+    return {
+      status: hasErrors ? 'error' : 'success',
+      results,
+    };
+    
   }
 }

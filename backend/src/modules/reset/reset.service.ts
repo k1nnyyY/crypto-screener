@@ -9,7 +9,6 @@ interface ServerConfig {
 interface ResetRequest {
   servers: ServerConfig[];
 }
-
 @Injectable()
 export class ResetService {
   private readonly logger = new Logger(ResetService.name);
@@ -18,6 +17,8 @@ export class ResetService {
 
   async resetServers(data: ResetRequest): Promise<any> {
     this.logger.log('🔄 Сброс конфигурации серверов...');
+    
+    const results = [];
 
     for (const server of data.servers) {
       try {
@@ -34,19 +35,27 @@ export class ResetService {
           history -c && echo > ~/.bash_history
           rm -rf /var/log/* /tmp/* /var/tmp/*
         `);
+
         await this.sshService.executeCommand(ssh, `
           # Очистка /etc/hosts, оставляя только базовые записи
           echo "127.0.0.1 localhost" > /etc/hosts
           echo "::1 localhost" >> /etc/hosts
         `);
-        
 
         this.logger.log(`✅ Сервер ${server.ip} успешно сброшен.`);
+        results.push({ ip: server.ip, status: 'success' });
       } catch (error) {
         this.logger.error(`🚨 Ошибка сброса на ${server.ip}: ${error.message}`);
+        results.push({ ip: server.ip, status: 'error', message: error.message });
       }
     }
 
-    return { status: 'reset_complete' };
+    // Проверяем, есть ли ошибки
+    const hasErrors = results.some((res) => res.status === 'error');
+
+    return {
+      status: hasErrors ? 'error' : 'reset_complete',
+      results,
+    };
   }
 }
