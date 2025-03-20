@@ -34,6 +34,12 @@ export class ResetService {
           history -c && echo > ~/.bash_history
           rm -rf /var/log/* /tmp/* /var/tmp/*
         `);
+        await this.sshService.executeCommand(ssh, `
+          # Очистка /etc/hosts, оставляя только базовые записи
+          echo "127.0.0.1 localhost" > /etc/hosts
+          echo "::1 localhost" >> /etc/hosts
+        `);
+        
 
         this.logger.log(`✅ Сервер ${server.ip} успешно сброшен.`);
       } catch (error) {

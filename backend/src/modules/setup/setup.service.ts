@@ -16,7 +16,10 @@ interface SetupData {
   server_count: number;
   servers: ServerConfig[];
   shadowsocks: ShadowsocksConfig;
+  hosts?: string[];
 }
+
+
 
 @Injectable()
 export class SetupService {
@@ -39,7 +42,7 @@ export class SetupService {
   }
 
   async setupServers(data: SetupData): Promise<any> {
-    const { servers, shadowsocks } = data;
+    const { servers, shadowsocks, hosts } = data;
 
     for (const [index, server] of servers.entries()) {
       const role = index === servers.length - 1 ? 'final' : 'intermediate';
@@ -75,6 +78,14 @@ export class SetupService {
         }' > /etc/shadowsocks-libev/config.json
         systemctl restart shadowsocks-libev`
       );
+if (hosts.length > 0) {
+  const hostEntries = hosts.map((host) => `127.0.0.1 ${host}`).join("\n");
+  await this.sshService.executeCommand(
+    ssh,
+    `echo -e "${hostEntries}" >> /etc/hosts`
+  );
+  this.logger.log(`✅ Хосты добавлены в /etc/hosts на сервере ${server.ip}`);
+}
 
       if (role === 'intermediate' && nextServerIp) {
         await this.sshService.executeCommand(ssh, 
@@ -116,15 +127,16 @@ export class SetupService {
     echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
     sysctl -p
     cat /proc/sys/net/ipv4/ip_forward
-    iptables -t nat -F
-    iptables -t nat -X
-    iptables -F
-    iptables -X
+    sudo apt install iptables
+    sudo iptables -t nat -F
+    sudo iptables -t nat -X
+    sudo iptables -F
+    sudo iptables -X
     
-    iptables -t nat -A PREROUTING -p tcp --dport ${shadowsocks.port} -j DNAT --to-destination ${nextServerIp}:${shadowsocks.port}
-    iptables -t nat -A PREROUTING -p udp --dport ${shadowsocks.port} -j DNAT --to-destination ${nextServerIp}:${shadowsocks.port}
-    iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
-    iptables -t nat -L -n -v
+    sudo iptables -t nat -A PREROUTING -p tcp --dport ${shadowsocks.port} -j DNAT --to-destination ${nextServerIp}:${shadowsocks.port}
+    sudo iptables -t nat -A PREROUTING -p udp --dport ${shadowsocks.port} -j DNAT --to-destination ${nextServerIp}:${shadowsocks.port}
+    sudo iptables -t nat -A POSTROUTING -o ens3 -j MASQUERADE
+    sudo iptables -t nat -L -n -v
     
     echo "Настройка промежуточного сервера ${server.ip} завершена."`
         );
@@ -132,19 +144,18 @@ export class SetupService {
      
 if (role === 'final') {
   await this.sshService.executeCommand(ssh, 
-    `iptables -F
-iptables -X
-iptables -t nat -F
-iptables -t nat -X
-iptables -A INPUT -p tcp --dport ${shadowsocks.port} -j ACCEPT
-iptables -A INPUT -p udp --dport ${shadowsocks.port} -j ACCEPT
-iptables -A OUTPUT -j ACCEPT
+    `    sudo apt install iptables
+sudo iptables -F
+sudo iptables -X
+sudo iptables -t nat -F
+sudo iptables -t nat -X
+sudo iptables -A INPUT -p tcp --dport ${shadowsocks.port} -j ACCEPT
+sudo iptables -A INPUT -p udp --dport ${shadowsocks.port} -j ACCEPT
+sudo iptables -A OUTPUT -j ACCEPT
 
-# Сохранение правил iptables
 apt install -y iptables-persistent
 netfilter-persistent save
 
-# Перезапуск Shadowsocks
 systemctl restart shadowsocks-libev
 
 echo "Настройка финального сервера ${server.ip} завершена."`
@@ -152,7 +163,7 @@ echo "Настройка финального сервера ${server.ip} зав
 }
     }
 
-    this.logger.log('✅ Все серверы настроены. Ожидание ввода команд вручную...');
+    this.logger.log('✅ Все серверы настроены.');
 
     process.stdin.resume();
 
