@@ -159,6 +159,8 @@ export class SetupService {
         console.log(`✅ Финальная настройка завершена на ${server.ip}\n${finalSetupOutput}`);
       }
     }
+    
+    await new Promise((resolve) => setTimeout(resolve, 360000));
 
     this.logger.log('✅ Все серверы настроены.');
     console.log('🎉 Все серверы успешно настроены!');
