@@ -23,19 +23,50 @@ export class ResetService {
     for (const server of data.servers) {
       try {
         const ssh = await this.sshService.connectToServer(server.ip, 'root', server.password);
-        this.logger.log(`🛠 Подключение к ${server.ip} для сброса...`);
+        this.logger.log(`🛠 Происходит сброс сервера ${server.ip}...`);
 
-        await this.sshService.executeCommand(ssh, `
-          systemctl stop shadowsocks-libev || true
-          rm -rf /etc/shadowsocks-libev/config.json /etc/shadowsocks-libev/config.json.enc
-          apt purge -y shadowsocks-libev || yum remove -y shadowsocks-libev || true
-          iptables -F && iptables -t nat -F && iptables-save > /etc/iptables.rules
-          echo "net.ipv4.ip_forward=0" | tee -a /etc/sysctl.conf
-          sysctl -w net.ipv4.ip_forward=0
-          history -c && echo > ~/.bash_history
-          rm -rf /var/log/* /tmp/* /var/tmp/*
-        `);
-
+        const steps = [
+          {
+            description: '⛔ Остановка Shadowsocks',
+            command: 'systemctl stop shadowsocks-libev || true',
+          },
+          {
+            description: '🧹 Удаление конфигов Shadowsocks',
+            command: 'rm -rf /etc/shadowsocks-libev/config.json /etc/shadowsocks-libev/config.json.enc',
+          },
+          {
+            description: '🧼 Удаление Shadowsocks-пакета',
+            command: 'apt purge -y shadowsocks-libev || yum remove -y shadowsocks-libev || true',
+          },
+          {
+            description: '🔥 Очистка iptables',
+            command: 'iptables -F && iptables -t nat -F && iptables-save > /etc/iptables.rules',
+          },
+          {
+            description: '🚫 Отключение IP Forwarding',
+            command: 'echo "net.ipv4.ip_forward=0" | tee -a /etc/sysctl.conf && sysctl -w net.ipv4.ip_forward=0',
+          },
+          {
+            description: '📜 Очистка истории команд',
+            command: 'history -c && echo > ~/.bash_history',
+          },
+          {
+            description: '🧽 Очистка логов и временных файлов',
+            command: 'rm -rf /var/log/* /tmp/* /var/tmp/*',
+          },
+        ];
+        
+        for (const step of steps) {
+          this.logger.log(`${step.description}...`);
+          try {
+            const output = await this.sshService.executeCommand(ssh, step.command);
+            this.logger.log(`✅ ${step.description} выполнено:\n${output}`);
+          } catch (err) {
+            this.logger.error(`🚨 Ошибка при выполнении шага: ${step.description}`, err.message);
+          }
+        }
+        
+        this.logger.log(`🛠 Происходит очистка хоста ${server.ip}...`);
         await this.sshService.executeCommand(ssh, `
           # Очистка /etc/hosts, оставляя только базовые записи
           echo "127.0.0.1 localhost" > /etc/hosts
