@@ -25,7 +25,7 @@ export class SetupService {
 
   constructor(private readonly sshService: SshService) {}
 
-  private async reconnect(serverIp: string, user: string, password: string): Promise<NodeSSH> {
+  private async reconnect(serverIp: string, user: string, password: string): Promise<NodeSSH | null> {
     let attempt = 0;
     while (attempt < 5) {
       try {
@@ -36,8 +36,10 @@ export class SetupService {
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
-    throw new Error(`🚨 Не удалось подключиться к ${serverIp}`);
+    this.logger.error(`🚨 Не удалось подключиться к ${serverIp} после 5 попыток. Сервер будет пропущен.`);
+    return null;
   }
+  
   private generateSafeInstallScript(pkg: string): string {
     return `
   bash -e -c '
@@ -114,7 +116,12 @@ export class SetupService {
       const role = index === servers.length - 1 ? 'final' : 'intermediate';
       const nextServerIp = servers[index + 1]?.ip;
       try {
-      const ssh = await this.reconnect(server.ip, 'root', server.password);
+        const ssh = await this.reconnect(server.ip, 'root', server.password);
+        if (!ssh) {
+          results.push({ ip: server.ip, status: 'skipped', message: 'Не удалось подключиться после 5 попыток' });
+          continue;
+        }
+      
 
       this.logger.log(`🛠 Настройка сервера ${server.ip} (Роль: ${role})`);
       console.log(`🚀 Начало настройки сервера: ${server.ip}`);
@@ -251,10 +258,21 @@ export class SetupService {
     console.log('🚀 Финальная настройка серверов...');
 
     for (const [index, server] of servers.entries()) {
+      const alreadySkipped = results.find(
+        (res) => res.ip === server.ip && res.status === 'skipped'
+      );
+      if (alreadySkipped) {
+        this.logger.warn(`⚠️ Сервер ${server.ip} пропущен (финишная настройка) — ранее не удалось подключиться.`);
+        continue;
+      }      
       const role = index === servers.length - 1 ? 'final' : 'intermediate';
       const nextServerIp = servers[index + 1]?.ip;
       const ssh = await this.reconnect(server.ip, 'root', server.password);
-
+      if (!ssh) {
+        this.logger.warn(`⚠️ Сервер ${server.ip} пропущен на этапе финальной настройки`);
+        continue;
+      }
+    
       if (role === 'intermediate' && nextServerIp) {
         const forwardingSteps = [
           {
