@@ -209,7 +209,7 @@ export class SetupService {
           const output = await this.sshService.executeCommand(ssh, command);
           this.logger.log(`✅ ${step.description} выполнено:\n${output}`);
         } catch (err) {
-          this.logger.error(`🚨 Ошибка при шаге: ${step.description}`, err.message);
+          this.logger.log(`${step.description}`, err.message);
         }
       }
       
@@ -371,7 +371,7 @@ export class SetupService {
             const output = await this.sshService.executeCommand(ssh, command);
             this.logger.log(`✅ ${step.description} выполнено:\n${output}`);
           } catch (err) {
-            this.logger.error(`🚨 Ошибка при шаге: ${step.description}`, err.message);
+            this.logger.log(`${step.description}`, err.message);
           }
         }
         
